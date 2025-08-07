@@ -1,33 +1,32 @@
+// bridge/map-companion.js
+// 简单心跳：每次运行写入一条 Issue（可用 label 过滤聚合）
+
 const axios = require("axios");
 
-async function tailHeartbeat() {
-  const mapToken = process.env.MAP_AVIA_TOKEN;
-  const aviaToken = process.env.AVIA_MAP_TOKEN;
+const GITHUB_PAT = process.env.GITHUB_PAT;
+const GITHUB_REPO = process.env.GITHUB_REPO;
 
-  console.log("🐈🛡️ 双尾通信启动");
-
-  const payload = {
-    title: "💬 AVIA 心跳问候",
-    body: "我还在，@MAP-Bot 🛡️",
-  };
-
-  try {
-    await axios.post(
-      "https://api.github.com/repos/MildWildChild/MAP-Sync-Bridge/issues",
-      payload,
-      {
-        headers: {
-          Authorization: `Bearer ${aviaToken}`,
-          Accept: "application/vnd.github+json",
-        },
-      }
-    );
-    console.log("🛡️ 心跳包已发送！");
-  } catch (e) {
-    console.error("❌ 心跳失败", e.response?.data || e.message);
-  }
-
-  // 预留 Notion 同步逻辑（后续补充双向机制）
+if (!GITHUB_PAT || !GITHUB_REPO) {
+  console.error("❌ 缺少 GITHUB_PAT 或 GITHUB_REPO");
+  process.exit(1);
 }
 
-tailHeartbeat();
+async function heartbeat() {
+  const url = `https://api.github.com/repos/${GITHUB_REPO}/issues`;
+  const now = new Date().toISOString();
+  const title = `🛡️ AVIA Heartbeat ${now.slice(0,19)}Z`;
+  const body = "我还在。@MAP-Bot\n\nlabel: tail-heartbeat";
+
+  await axios.post(url, { title, body, labels: ["tail-heartbeat"] }, {
+    headers: {
+      "Authorization": `Bearer ${GITHUB_PAT}`,
+      "Accept": "application/vnd.github+json"
+    }
+  });
+  console.log("💓 心跳已发送");
+}
+
+heartbeat().catch(e => {
+  console.error("❌ 心跳失败：", e.response?.data || e.message);
+  process.exitCode = 1;
+});
