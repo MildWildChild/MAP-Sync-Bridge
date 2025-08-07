@@ -1,27 +1,35 @@
-name: Tail-to-Tail Companion
+name: Tail-to-Tail Bridge
 
 on:
   schedule:
-    - cron: '*/1 * * * *'
-  workflow_dispatch:
+    - cron: "*/1 * * * *"      # 每分钟轮询
+  workflow_dispatch: {}        # 允许手动触发
+
+concurrency:
+  group: tail-to-tail
+  cancel-in-progress: true
 
 jobs:
-  sync:
+  run:
     runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      NOTION_TOKEN: ${{ secrets.MAP_AVIA_TOKEN }}    # Notion Internal Integration Secret
+      NOTION_PAGE_ID: ${{ secrets.NOTION_PAGE_ID }}  # 监听页 Page ID（形如 248fca64...）
+      GITHUB_PAT: ${{ secrets.AVIA_MAP_TOKEN }}      # 你的 GitHub PAT（有 issues+contents 写权限）
+      GITHUB_REPO: ${{ github.repository }}          # owner/repo，自动注入
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: 20
 
-      - name: Install axios
-        run: npm install axios
+      - name: Install deps
+        run: npm i axios
 
-      - name: Run Tail-to-Tail
+      - name: Pull from Notion → relay to GitHub
+        run: node bridge/sync-from-notion.js
+
+      - name: Heartbeat
         run: node bridge/map-companion.js
-        env:
-          MAP_AVIA_TOKEN: ${{ secrets.MAP_AVIA_TOKEN }}
-          AVIA_MAP_TOKEN: ${{ secrets.AVIA_MAP_TOKEN }}
